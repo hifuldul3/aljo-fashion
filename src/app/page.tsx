@@ -9,10 +9,11 @@ export const revalidate = 0;
 
 async function getHomePageData() {
   try {
-    const banners = await prisma.banner.findMany({
-      where: { isActive: true },
-      orderBy: { position: 'asc' },
-    });
+   const banners = await prisma.banner.findMany({
+  where: { isActive: true },
+  orderBy: { position: "asc" },
+});
+
 
     const categories = await prisma.category.findMany({
       include: { _count: { select: { products: true } } },
@@ -72,7 +73,18 @@ async function getHomePageData() {
 
 export default async function HomePage() {
   const data = await getHomePageData();
-  const heroBanner = data.banners[0];
+
+  const fallbackHeroBanner = {
+    id: "default-banner",
+    title: "The Royal Elegance Collection '26",
+    subtitle: "Bespoke couture for modern connoisseurs.",
+    image:
+      "https://images.unsplash.com/photo-1496747611176-843222e1e57c?auto=format&fit=crop&w=1920&q=80",
+    linkText: "Shop Collection",
+  };
+
+  const heroBanner =
+    data?.banners?.[0] ?? fallbackHeroBanner;
 
   return (
     <div className="space-y-24 pb-20">
@@ -81,7 +93,7 @@ export default async function HomePage() {
         {/* Parallax Background */}
         <div className="absolute inset-0 z-0">
           <img
-            src={heroBanner.image}
+           src={heroBanner?.image || fallbackHeroBanner.image}
             alt="AL-JO Fashion Banner"
             className="w-full h-full object-cover object-center filter brightness-[0.75] contrast-[0.95] scale-105 transition-transform duration-1000"
           />
