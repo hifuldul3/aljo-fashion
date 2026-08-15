@@ -177,8 +177,8 @@ export default function TrackOrderDetailPage() {
 
           <div className="p-3.5 rounded-2xl bg-neutral-900/80 border border-neutral-800 space-y-1">
             <span className="text-[10px] font-extrabold uppercase tracking-widest text-amber-400">INSTANT UPI TRANSFER</span>
-            <p><span className="text-neutral-500">Primary VPA / UPI ID:</span> <strong className="text-amber-300 font-mono">aljofashion@okaxis</strong></p>
-            <p><span className="text-neutral-500">Secondary UPI:</span> <strong className="text-amber-300 font-mono">aljo@upi</strong></p>
+            <p><span className="text-neutral-500">Primary VPA / UPI ID:</span> <strong className="text-amber-300 font-mono">hifuldul3-3@okhdfcbank</strong></p>
+            <p><span className="text-neutral-500">Secondary UPI:</span> <strong className="text-amber-300 font-mono">hifuldul3-2@okhdfcbank</strong></p>
             <p><span className="text-neutral-500">Accepted Apps:</span> GPay, PhonePe, Paytm, BHIM</p>
             <p className="text-[10px] text-neutral-400 pt-1">Reference order <span className="text-amber-300 font-mono">#{order.orderNumber}</span> in payment remarks.</p>
           </div>

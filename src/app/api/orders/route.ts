@@ -42,7 +42,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { items, shippingAddress, paymentMethod, couponCode, subtotal, discountAmount, shippingFee, totalAmount, notes } = body;
+    const { items, shippingAddress, paymentMethod, couponCode, notes } = body;
 
     if (!items || items.length === 0 || !shippingAddress) {
       return NextResponse.json({ error: 'Order items and shipping address are required' }, { status: 400 });
@@ -56,6 +56,65 @@ export async function POST(request: Request) {
       );
     }
 
+    // -------------------------------------------------------------
+    // ANTI-HACKING SERVER-SIDE PRICE VALIDATION
+    // Recalculate true total directly from database product prices
+    // -------------------------------------------------------------
+    let calculatedSubtotal = 0;
+    const validatedItems = [];
+
+    for (const item of items) {
+      const dbProduct = await prisma.product.findUnique({
+        where: { id: item.productId },
+        include: { variants: true },
+      });
+
+      if (!dbProduct) {
+        return NextResponse.json({ error: `Product "${item.name}" is no longer available.` }, { status: 400 });
+      }
+
+      // Use true server price (discountPrice if active, else regular price)
+      const trueUnitPrice = dbProduct.discountPrice !== null && dbProduct.discountPrice !== undefined
+        ? Number(dbProduct.discountPrice)
+        : Number(dbProduct.price);
+
+      const qty = Math.max(1, parseInt(item.quantity || 1, 10));
+      calculatedSubtotal += trueUnitPrice * qty;
+
+      validatedItems.push({
+        productId: dbProduct.id,
+        variantId: item.variant?.id || null,
+        productName: dbProduct.name,
+        productImage: item.image || (typeof dbProduct.images === 'string' ? JSON.parse(dbProduct.images)[0] : dbProduct.images?.[0]),
+        size: item.variant?.size || 'Default',
+        color: item.variant?.color || 'Default',
+        price: trueUnitPrice,
+        quantity: qty,
+      });
+    }
+
+    // Calculate coupon discount
+    let calculatedDiscount = 0;
+    if (couponCode) {
+      const dbCoupon = await prisma.coupon.findUnique({
+        where: { code: couponCode.toUpperCase() },
+      });
+
+      if (dbCoupon && dbCoupon.isActive && calculatedSubtotal >= Number(dbCoupon.minOrderValue || 0)) {
+        if (dbCoupon.discountType === 'PERCENTAGE') {
+          calculatedDiscount = (calculatedSubtotal * Number(dbCoupon.discountValue)) / 100;
+          if (dbCoupon.maxDiscount && calculatedDiscount > Number(dbCoupon.maxDiscount)) {
+            calculatedDiscount = Number(dbCoupon.maxDiscount);
+          }
+        } else {
+          calculatedDiscount = Number(dbCoupon.discountValue);
+        }
+      }
+    }
+
+    const calculatedShipping = calculatedSubtotal >= 2999 ? 0 : 150;
+    const calculatedTotal = Math.max(0, calculatedSubtotal - calculatedDiscount + calculatedShipping);
+
     // Generate unique order number (e.g., ALJO-48291)
     const orderNumber = `ALJO-${Math.floor(10000 + Math.random() * 90000)}`;
     const mockPaymentId = paymentMethod === 'COD' ? null : `pay_razor_${Math.random().toString(36).substring(2, 10)}`;
@@ -65,10 +124,10 @@ export async function POST(request: Request) {
         orderNumber,
         userId: user.id,
         status: 'CONFIRMED',
-        subtotal: parseFloat(subtotal),
-        discountAmount: parseFloat(discountAmount || 0),
-        shippingFee: parseFloat(shippingFee || 0),
-        totalAmount: parseFloat(totalAmount),
+        subtotal: calculatedSubtotal,
+        discountAmount: calculatedDiscount,
+        shippingFee: calculatedShipping,
+        totalAmount: calculatedTotal,
         paymentStatus: paymentMethod === 'COD' ? 'PENDING' : 'PAID',
         paymentMethod: paymentMethod || 'RAZORPAY',
         paymentId: mockPaymentId,
@@ -76,26 +135,17 @@ export async function POST(request: Request) {
         shippingAddress: JSON.stringify(shippingAddress),
         notes: notes || null,
         items: {
-          create: items.map((item: any) => ({
-            productId: item.productId,
-            variantId: item.variant?.id || null,
-            productName: item.name,
-            productImage: item.image,
-            size: item.variant?.size || 'Default',
-            color: item.variant?.color || 'Default',
-            price: parseFloat(item.price),
-            quantity: parseInt(item.quantity),
-          })),
+          create: validatedItems,
         },
       },
       include: { items: true },
     });
 
     // Update variant and product stock counts
-    for (const item of items) {
-      if (item.variant?.id) {
+    for (const item of validatedItems) {
+      if (item.variantId) {
         await prisma.productVariant.update({
-          where: { id: item.variant.id },
+          where: { id: item.variantId },
           data: { stock: { decrement: item.quantity } },
         }).catch(() => {});
       }
@@ -118,7 +168,7 @@ export async function POST(request: Request) {
       data: {
         userId: user.id,
         title: `Order Placed Successfully!`,
-        message: `Your order #${orderNumber} for ₹${totalAmount.toLocaleString()} has been confirmed.`,
+        message: `Your order #${orderNumber} for ₹${calculatedTotal.toLocaleString()} has been confirmed.`,
         type: 'ORDER',
       },
     }).catch(() => {});

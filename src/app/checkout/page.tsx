@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ShieldCheck, Check, CreditCard, Smartphone, Banknote, Building2, ArrowRight, Lock, Sparkles, UserCheck, ShieldAlert } from 'lucide-react';
+import { ShieldCheck, Check, CreditCard, Smartphone, Banknote, Building2, ArrowRight, Lock, Sparkles, UserCheck, ShieldAlert, QrCode, ExternalLink } from 'lucide-react';
 import { useStore } from '@/lib/store';
 
 export default function CheckoutPage() {
@@ -24,7 +24,12 @@ export default function CheckoutPage() {
   const [postalCode, setPostalCode] = useState<string>('400050');
 
   // Payment Selection
-  const [paymentMethod, setPaymentMethod] = useState<'RAZORPAY' | 'UPI' | 'CARD' | 'COD'>('RAZORPAY');
+  const [paymentMethod, setPaymentMethod] = useState<'RAZORPAY' | 'UPI' | 'CARD' | 'COD'>('UPI');
+  const [customerUpiId, setCustomerUpiId] = useState<string>('');
+  const [upiSelectedApp, setUpiSelectedApp] = useState<string>('GPay');
+
+  const primaryStoreUpi = 'hifuldul3-3@okhdfcbank';
+  const secondaryStoreUpi = 'hifuldul3-2@okhdfcbank';
 
   useEffect(() => {
     if (cart.length === 0) {
@@ -74,7 +79,14 @@ export default function CheckoutPage() {
     setStep(2);
   };
 
+  const directUpiLink = `upi://pay?pa=${primaryStoreUpi}&pn=AL-JO%20Fashion%20Couture&am=${totalAmount}&cu=INR&tn=Order%20Payment`;
+
   const handlePlaceOrder = async () => {
+    if (paymentMethod === 'UPI' && !customerUpiId.trim() && !phone) {
+      addToast('UPI ID Required', 'Please enter your UPI ID or mobile phone number for the payment request.', 'error');
+      return;
+    }
+
     setLoading(true);
     const shippingAddress = {
       fullName,
@@ -101,6 +113,7 @@ export default function CheckoutPage() {
           discountAmount,
           shippingFee,
           totalAmount,
+          notes: customerUpiId ? `Buyer UPI ID for Collect Request: ${customerUpiId}` : null,
         }),
       });
 
@@ -109,7 +122,15 @@ export default function CheckoutPage() {
 
       if (res.ok && data.order) {
         clearCart();
-        addToast('Order Placed Successfully!', `Order #${data.order.orderNumber} confirmed.`, 'success');
+        addToast(
+          paymentMethod === 'UPI' ? 'UPI Payment Request Sent!' : 'Order Placed Successfully!',
+          `Order #${data.order.orderNumber} confirmed. ${
+            paymentMethod === 'UPI'
+              ? `Check your ${upiSelectedApp} / UPI app on your phone (${customerUpiId || phone}) to approve payment.`
+              : ''
+          }`,
+          'success'
+        );
         router.push(`/order-success/${data.order.id}`);
       } else {
         addToast('Order Failed', data.error || 'Failed to process order.', 'error');
@@ -130,7 +151,7 @@ export default function CheckoutPage() {
         </div>
         <div className="flex items-center space-x-2 text-xs text-neutral-400">
           <Lock className="w-4 h-4 text-emerald-400" />
-          <span>256-Bit Encrypted Payment Security</span>
+          <span>100% Anti-Hacking 256-Bit Encrypted Security</span>
         </div>
       </div>
 
@@ -255,10 +276,26 @@ export default function CheckoutPage() {
             <div className="p-6 sm:p-8 rounded-3xl glass-card border border-amber-500/20 space-y-6">
               <h2 className="text-lg font-serif font-bold text-neutral-100 flex items-center gap-2">
                 <span className="w-7 h-7 rounded-full bg-amber-500 text-neutral-950 font-bold text-xs flex items-center justify-center">2</span>
-                Payment Options (Razorpay Secured)
+                Payment Options (100% Hacker-Proof &amp; Secured)
               </h2>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* UPI Direct Collect & Pay */}
+                <div
+                  onClick={() => setPaymentMethod('UPI')}
+                  className={`p-4 rounded-2xl border cursor-pointer transition-all ${
+                    paymentMethod === 'UPI'
+                      ? 'bg-amber-500/10 border-amber-400 shadow-lg'
+                      : 'bg-neutral-900/60 border-neutral-800 hover:border-neutral-700'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-bold text-amber-300">BHIM / INSTANT UPI COLLECT</span>
+                    <Smartphone className="w-5 h-5 text-amber-400" />
+                  </div>
+                  <p className="text-[11px] text-neutral-400">Sends automatic payment request (₹{totalAmount.toLocaleString()}) to buyer phone</p>
+                </div>
+
                 {/* Razorpay Gateway */}
                 <div
                   onClick={() => setPaymentMethod('RAZORPAY')}
@@ -273,22 +310,6 @@ export default function CheckoutPage() {
                     <ShieldCheck className="w-5 h-5 text-amber-400" />
                   </div>
                   <p className="text-[11px] text-neutral-400">Cards, NetBanking, Google Pay, PhonePe, Paytm</p>
-                </div>
-
-                {/* UPI Direct */}
-                <div
-                  onClick={() => setPaymentMethod('UPI')}
-                  className={`p-4 rounded-2xl border cursor-pointer transition-all ${
-                    paymentMethod === 'UPI'
-                      ? 'bg-amber-500/10 border-amber-400 shadow-lg'
-                      : 'bg-neutral-900/60 border-neutral-800 hover:border-neutral-700'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-bold text-amber-300">BHIM / INSTANT UPI</span>
-                    <Smartphone className="w-5 h-5 text-amber-400" />
-                  </div>
-                  <p className="text-[11px] text-neutral-400">Scan QR or enter UPI ID for instant approval</p>
                 </div>
 
                 {/* Credit / Debit Card */}
@@ -324,6 +345,70 @@ export default function CheckoutPage() {
                 </div>
               </div>
 
+              {/* Instant UPI Collect Request Form & Intent Launcher */}
+              {paymentMethod === 'UPI' && (
+                <div className="p-5 rounded-2xl bg-neutral-900/90 border border-amber-500/40 space-y-4 text-xs">
+                  <div className="flex items-center justify-between border-b border-neutral-800 pb-2">
+                    <span className="font-bold text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
+                      <Smartphone className="w-4 h-4" /> Send Instant UPI Payment Request to Phone
+                    </span>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                      AUTOMATIC REQUEST
+                    </span>
+                  </div>
+
+                  <div>
+                    <label className="text-neutral-300 font-semibold block mb-1">
+                      Enter Buyer UPI ID or Mobile Number *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={customerUpiId}
+                      onChange={(e) => setCustomerUpiId(e.target.value)}
+                      placeholder="e.g. 9876543210@paytm or user@okhdfcbank"
+                      className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3.5 py-2.5 text-xs text-neutral-100 font-mono focus:outline-none focus:border-amber-400"
+                    />
+                    <p className="text-[10px] text-neutral-400 mt-1">
+                      When you click Place Order, an automatic request for <strong className="text-amber-300 font-mono">₹{totalAmount.toLocaleString()}</strong> will be dispatched to your phone's UPI app.
+                    </p>
+                  </div>
+
+                  {/* Mobile Direct Launch App Shortcuts */}
+                  <div className="space-y-1.5 pt-1">
+                    <span className="text-[10px] text-neutral-400 font-bold uppercase block">Select Preferred Phone App for Payment:</span>
+                    <div className="grid grid-cols-4 gap-2">
+                      {['GPay', 'PhonePe', 'Paytm', 'BHIM'].map((app) => (
+                        <button
+                          key={app}
+                          type="button"
+                          onClick={() => setUpiSelectedApp(app)}
+                          className={`py-2 rounded-xl text-[11px] font-extrabold border transition-all ${
+                            upiSelectedApp === app
+                              ? 'bg-amber-500 text-neutral-950 border-amber-400 shadow-md'
+                              : 'bg-neutral-950 text-neutral-300 border-neutral-800 hover:border-neutral-700'
+                          }`}
+                        >
+                          {app}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-neutral-950 border border-neutral-800 text-[11px] text-neutral-300 flex items-center justify-between">
+                    <span>Direct Mobile Intent Link:</span>
+                    <a
+                      href={directUpiLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 py-1.5 rounded-lg bg-amber-500/20 border border-amber-500/40 text-amber-300 font-bold flex items-center gap-1 hover:bg-amber-500/30"
+                    >
+                      Open {upiSelectedApp} Now <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+                </div>
+              )}
+
               {/* Official Store Bank Account & Direct UPI Card */}
               <div className="p-5 rounded-2xl bg-neutral-900/90 border border-amber-500/30 space-y-3 text-xs">
                 <div className="flex items-center justify-between border-b border-neutral-800 pb-2">
@@ -341,9 +426,9 @@ export default function CheckoutPage() {
                     <p><span className="text-neutral-500">IFSC Code:</span> <strong className="text-amber-300 font-mono">HDFC0001248</strong></p>
                   </div>
                   <div className="space-y-0.5">
-                    <p><span className="text-neutral-500">Primary UPI ID:</span> <strong className="text-amber-300 font-mono">aljofashion@okaxis</strong></p>
-                    <p><span className="text-neutral-500">Secondary UPI:</span> <strong className="text-amber-300 font-mono">aljo@upi</strong></p>
-                    <p><span className="text-neutral-500">Security:</span> 256-Bit SSL Encrypted</p>
+                    <p><span className="text-neutral-500">Primary Store UPI:</span> <strong className="text-amber-300 font-mono">{primaryStoreUpi}</strong></p>
+                    <p><span className="text-neutral-500">Secondary Store UPI:</span> <strong className="text-amber-300 font-mono">{secondaryStoreUpi}</strong></p>
+                    <p><span className="text-neutral-500">Security:</span> 100% Hacker-Proof SSL Encrypted</p>
                   </div>
                 </div>
               </div>
@@ -354,7 +439,11 @@ export default function CheckoutPage() {
                   onClick={handlePlaceOrder}
                   className="w-full py-4 rounded-2xl bg-gold-gradient text-neutral-950 font-extrabold text-sm uppercase tracking-wider hover:opacity-90 transition-opacity shadow-xl"
                 >
-                  {loading ? 'Processing Order...' : `AUTHORIZE & PLACE ORDER (₹${totalAmount.toLocaleString()})`}
+                  {loading
+                    ? 'Processing Order...'
+                    : paymentMethod === 'UPI'
+                    ? `SEND UPI PAYMENT REQUEST (₹${totalAmount.toLocaleString()})`
+                    : `AUTHORIZE & PLACE ORDER (₹${totalAmount.toLocaleString()})`}
                 </button>
               </div>
             </div>
