@@ -36,7 +36,7 @@ export default function Navbar() {
     { name: 'Shop All', href: '/shop' },
     { name: 'Men', href: '/shop?gender=men' },
     { name: 'Women', href: '/shop?gender=women' },
-    { name: 'Kids', href: '/shop?category=kids' },
+    { name: 'Kids', href: '/shop?gender=kids' },
     { name: 'New Arrivals', href: '/shop?newArrival=true' },
     { name: 'Offers', href: '/shop?bestSeller=true' },
   ];

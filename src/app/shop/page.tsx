@@ -63,8 +63,14 @@ function ShopContent() {
   };
 
   useEffect(() => {
+    setSelectedCategory(searchParams.get('category') || '');
+    setSelectedGender(searchParams.get('gender') || '');
+    setSearchQuery(searchParams.get('search') || '');
+  }, [searchParams]);
+
+  useEffect(() => {
     fetchProducts();
-  }, [selectedCategory, selectedGender, selectedSize, selectedColor, maxPrice, sortOption, searchQuery]);
+  }, [selectedCategory, selectedGender, selectedSize, selectedColor, maxPrice, sortOption, searchQuery, searchParams]);
 
   const resetFilters = () => {
     setSelectedCategory('');
