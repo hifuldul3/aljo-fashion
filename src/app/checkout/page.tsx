@@ -291,6 +291,30 @@ export default function CheckoutPage() {
                 </div>
               </div>
 
+              {/* Official Store Bank Account & Direct UPI Card */}
+              <div className="p-5 rounded-2xl bg-neutral-900/90 border border-amber-500/30 space-y-3 text-xs">
+                <div className="flex items-center justify-between border-b border-neutral-800 pb-2">
+                  <div className="flex items-center space-x-2">
+                    <Building2 className="w-4 h-4 text-amber-400" />
+                    <span className="font-bold text-neutral-100">Official Store Bank &amp; Direct UPI Account</span>
+                  </div>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300">VERIFIED STORE BANK</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-neutral-300">
+                  <div className="space-y-0.5">
+                    <p><span className="text-neutral-500">Bank Name:</span> <strong>HDFC Bank Ltd</strong></p>
+                    <p><span className="text-neutral-500">Account Name:</span> <strong>AL-JO Fashion Couture</strong></p>
+                    <p><span className="text-neutral-500">Account No:</span> <strong className="text-amber-300 font-mono">50200084920194</strong></p>
+                    <p><span className="text-neutral-500">IFSC Code:</span> <strong className="text-amber-300 font-mono">HDFC0001248</strong></p>
+                  </div>
+                  <div className="space-y-0.5">
+                    <p><span className="text-neutral-500">Primary UPI ID:</span> <strong className="text-amber-300 font-mono">aljofashion@okaxis</strong></p>
+                    <p><span className="text-neutral-500">Secondary UPI:</span> <strong className="text-amber-300 font-mono">aljo@upi</strong></p>
+                    <p><span className="text-neutral-500">Security:</span> 256-Bit SSL Encrypted</p>
+                  </div>
+                </div>
+              </div>
+
               <div className="pt-4 border-t border-neutral-800">
                 <button
                   disabled={loading}
