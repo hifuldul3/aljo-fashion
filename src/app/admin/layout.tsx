@@ -24,34 +24,42 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const router = useRouter();
   const { user, setUser, addToast } = useStore();
   const [checkingAuth, setCheckingAuth] = useState(true);
+  const [authorized, setAuthorized] = useState(false);
 
   useEffect(() => {
-    // Check if user is logged in as ADMIN
-    const checkAdminStatus = async () => {
-      if (!user) {
-        try {
-          const res = await fetch('/api/auth/me');
-          const data = await res.json();
-          if (data.user && data.user.role === 'ADMIN') {
-            setUser(data.user);
-            setCheckingAuth(false);
+    let isMounted = true;
+
+    const verifyAdmin = async () => {
+      try {
+        const res = await fetch('/api/auth/me');
+        const data = await res.json();
+        
+        const currentUser = data.user || user;
+        const isAdmin = currentUser && (currentUser.role?.toUpperCase() === 'ADMIN');
+
+        if (isMounted) {
+          if (isAdmin) {
+            setUser(currentUser);
+            setAuthorized(true);
           } else {
-            addToast('Access Denied', 'Store Owner / Admin login required to access dashboard.', 'error');
-            router.push('/login');
+            setAuthorized(false);
           }
-        } catch {
-          router.push('/login');
+          setCheckingAuth(false);
         }
-      } else if (user.role !== 'ADMIN') {
-        addToast('Access Denied', 'You do not have owner permissions to view this portal.', 'error');
-        router.push('/login');
-      } else {
-        setCheckingAuth(false);
+      } catch {
+        if (isMounted) {
+          setAuthorized(false);
+          setCheckingAuth(false);
+        }
       }
     };
 
-    checkAdminStatus();
-  }, [user, router, setUser, addToast]);
+    verifyAdmin();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const handleLogout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
@@ -81,17 +89,26 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     );
   }
 
-  if (!user || user.role !== 'ADMIN') {
+  if (!authorized) {
     return (
-      <div className="min-h-screen bg-neutral-950 text-neutral-100 flex flex-col items-center justify-center p-6 space-y-4 text-center">
-        <ShieldAlert className="w-16 h-16 text-red-500 mx-auto" />
-        <h2 className="text-2xl font-serif font-bold text-neutral-100">Store Owner Access Required</h2>
-        <p className="text-xs text-neutral-400 max-w-sm">
-          This portal is strictly restricted to authenticated Store Managers &amp; Admins.
-        </p>
-        <Link href="/login" className="px-6 py-2.5 rounded-full bg-gold-gradient text-neutral-950 text-xs font-bold">
-          Log In as Store Owner
-        </Link>
+      <div className="min-h-screen bg-neutral-950 text-neutral-100 flex flex-col items-center justify-center p-6 space-y-6 text-center">
+        <div className="w-20 h-20 rounded-full bg-red-500/10 border border-red-500/30 flex items-center justify-center text-red-400">
+          <ShieldAlert className="w-10 h-10" />
+        </div>
+        <div className="space-y-2">
+          <h2 className="text-2xl font-serif font-extrabold text-neutral-100">Store Owner Access Required</h2>
+          <p className="text-xs text-neutral-400 max-w-sm mx-auto">
+            You must be logged in as a Store Owner / Admin (<strong className="text-amber-300 font-mono">admin@aljo.com</strong>) to view the Owner Dashboard.
+          </p>
+        </div>
+        <div className="flex flex-col sm:flex-row gap-3">
+          <Link href="/login" className="px-6 py-2.5 rounded-full bg-gold-gradient text-neutral-950 text-xs font-extrabold uppercase tracking-wider">
+            🔑 Sign In as Store Owner
+          </Link>
+          <Link href="/" className="px-6 py-2.5 rounded-full bg-neutral-900 border border-neutral-800 text-neutral-300 text-xs font-bold">
+            Back to Storefront
+          </Link>
+        </div>
       </div>
     );
   }

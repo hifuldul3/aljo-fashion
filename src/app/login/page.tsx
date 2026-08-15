@@ -15,10 +15,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email || !password) return;
-
+  const executeLogin = async (loginEmail: string, loginPass: string) => {
     setLoading(true);
     setError('');
 
@@ -26,7 +23,7 @@ export default function LoginPage() {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email: loginEmail, password: loginPass }),
       });
       const data = await res.json();
       setLoading(false);
@@ -34,7 +31,7 @@ export default function LoginPage() {
       if (res.ok && data.user) {
         setUser(data.user);
         addToast('Welcome Back!', `Logged in as ${data.user.name}`, 'success');
-        if (data.user.role === 'ADMIN') {
+        if (data.user.role?.toUpperCase() === 'ADMIN') {
           router.push('/admin');
         } else {
           router.push('/account');
@@ -48,10 +45,17 @@ export default function LoginPage() {
     }
   };
 
-  // One-click quick demo login helper
-  const fillDemoAccount = (demoEmail: string, demoPass: string) => {
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email || !password) return;
+    executeLogin(email, password);
+  };
+
+  // 1-Click Instant Demo Login Helper
+  const fillAndLogin = (demoEmail: string, demoPass: string) => {
     setEmail(demoEmail);
     setPassword(demoPass);
+    executeLogin(demoEmail, demoPass);
   };
 
   return (
@@ -65,13 +69,13 @@ export default function LoginPage() {
       {/* Quick Demo Login Preset Buttons */}
       <div className="glass-card rounded-2xl p-4 border border-amber-500/30 space-y-2">
         <span className="text-[10px] font-extrabold uppercase tracking-widest text-amber-400 flex items-center gap-1.5">
-          <Sparkles className="w-3.5 h-3.5" /> Quick Demo Credentials:
+          <Sparkles className="w-3.5 h-3.5" /> 1-Click Demo Login:
         </span>
         <div className="grid grid-cols-2 gap-2">
           <button
             type="button"
-            onClick={() => fillDemoAccount('admin@aljo.com', 'admin123')}
-            className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/40 text-amber-300 hover:bg-amber-500/20 text-xs text-left"
+            onClick={() => fillAndLogin('admin@aljo.com', 'admin123')}
+            className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/40 text-amber-300 hover:bg-amber-500/20 text-xs text-left cursor-pointer transition-colors"
           >
             <div className="font-bold flex items-center justify-between">
               <span>👑 Store Owner</span>
@@ -81,8 +85,8 @@ export default function LoginPage() {
 
           <button
             type="button"
-            onClick={() => fillDemoAccount('user@aljo.com', 'user123')}
-            className="p-2.5 rounded-xl bg-neutral-900 border border-neutral-800 text-neutral-200 hover:border-amber-400 text-xs text-left"
+            onClick={() => fillAndLogin('user@aljo.com', 'user123')}
+            className="p-2.5 rounded-xl bg-neutral-900 border border-neutral-800 text-neutral-200 hover:border-amber-400 text-xs text-left cursor-pointer transition-colors"
           >
             <div className="font-bold flex items-center justify-between">
               <span>👤 Customer</span>
@@ -105,7 +109,7 @@ export default function LoginPage() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="user@aljo.com"
+              placeholder="admin@aljo.com"
               className="w-full bg-neutral-900 border border-neutral-800 rounded-xl pl-10 pr-4 py-2.5 text-xs text-neutral-200 focus:outline-none focus:border-amber-400"
             />
           </div>
