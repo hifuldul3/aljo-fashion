@@ -8,21 +8,45 @@ export async function POST(request: Request) {
     const { name, email, password, phone } = await request.json();
 
     if (!name || !email || !password) {
-      return NextResponse.json({ error: 'Name, email and password are required' }, { status: 400 });
+      return NextResponse.json({ error: 'Name, email and password are required.' }, { status: 400 });
     }
 
-    const existing = await prisma.user.findUnique({ where: { email } });
-    if (existing) {
-      return NextResponse.json({ error: 'Account with this email already exists' }, { status: 400 });
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // 1. Check if email already registered
+    const existingEmail = await prisma.user.findFirst({
+      where: { email: normalizedEmail },
+    });
+
+    if (existingEmail) {
+      return NextResponse.json(
+        { error: 'An account with this email address already exists. Please sign in instead.' },
+        { status: 400 }
+      );
+    }
+
+    // 2. Check if phone already registered (if phone is provided)
+    if (phone && phone.trim()) {
+      const normalizedPhone = phone.trim();
+      const existingPhone = await prisma.user.findFirst({
+        where: { phone: normalizedPhone },
+      });
+
+      if (existingPhone) {
+        return NextResponse.json(
+          { error: 'An account with this phone number already exists. Please sign in or use a different phone number.' },
+          { status: 400 }
+        );
+      }
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
     const user = await prisma.user.create({
       data: {
-        name,
-        email,
+        name: name.trim(),
+        email: normalizedEmail,
         passwordHash,
-        phone: phone || null,
+        phone: phone ? phone.trim() : null,
         role: 'CUSTOMER',
       },
     });
@@ -36,7 +60,7 @@ export async function POST(request: Request) {
 
     const response = NextResponse.json({
       success: true,
-      user: { id: user.id, name: user.name, email: user.email, role: user.role },
+      user: { id: user.id, name: user.name, email: user.email, role: user.role, phone: user.phone },
     });
 
     response.cookies.set('aljo_token', token, {

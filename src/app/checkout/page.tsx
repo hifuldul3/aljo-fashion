@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ShieldCheck, Check, CreditCard, Smartphone, Banknote, Building2, ArrowRight, Lock, Sparkles } from 'lucide-react';
+import { ShieldCheck, Check, CreditCard, Smartphone, Banknote, Building2, ArrowRight, Lock, Sparkles, UserCheck, ShieldAlert } from 'lucide-react';
 import { useStore } from '@/lib/store';
 
 export default function CheckoutPage() {
@@ -24,13 +25,45 @@ export default function CheckoutPage() {
 
   // Payment Selection
   const [paymentMethod, setPaymentMethod] = useState<'RAZORPAY' | 'UPI' | 'CARD' | 'COD'>('RAZORPAY');
-  const [isRazorpayModalOpen, setIsRazorpayModalOpen] = useState<boolean>(false);
 
   useEffect(() => {
     if (cart.length === 0) {
       router.push('/shop');
     }
   }, [cart, router]);
+
+  // If user is not logged in, prompt required login guard to complete order
+  if (!user) {
+    return (
+      <div className="max-w-xl mx-auto px-4 py-20 text-center space-y-6">
+        <div className="w-20 h-20 rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 mx-auto">
+          <UserCheck className="w-10 h-10" />
+        </div>
+        <div className="space-y-2">
+          <span className="text-xs font-bold uppercase tracking-widest text-amber-400">PATRON ACCOUNT REQUIRED</span>
+          <h1 className="text-3xl font-serif font-extrabold text-neutral-100">Sign In to Complete Your Order</h1>
+          <p className="text-xs text-neutral-400 max-w-md mx-auto">
+            You can freely browse products and add items to your bag. To authorize your order and enable real-time courier tracking, please sign in or create an account.
+          </p>
+        </div>
+
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-2">
+          <Link
+            href="/login"
+            className="w-full sm:w-auto px-8 py-3.5 rounded-full bg-gold-gradient text-neutral-950 font-extrabold text-xs uppercase tracking-wider hover:opacity-90 shadow-lg"
+          >
+            🔑 Sign In to Order
+          </Link>
+          <Link
+            href="/register"
+            className="w-full sm:w-auto px-8 py-3.5 rounded-full bg-neutral-900 border border-neutral-800 text-neutral-200 hover:border-amber-400 font-extrabold text-xs uppercase tracking-wider"
+          >
+            ✨ Register New Account
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   const handleAddressSubmit = (e: React.FormEvent) => {
     e.preventDefault();
