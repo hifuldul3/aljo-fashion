@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { User, Mail, Lock, Phone, ArrowRight } from 'lucide-react';
+import { User, Mail, Lock, Phone, ArrowRight, ShieldCheck } from 'lucide-react';
 import { useStore } from '@/lib/store';
 
 export default function RegisterPage() {
@@ -12,14 +12,26 @@ export default function RegisterPage() {
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [phone, setPhone] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name || !email || !password) return;
+    if (!name || !email || !password || !confirmPassword) return;
+
+    if (password !== confirmPassword) {
+      setError('Passwords do not match. Please make sure both passwords match.');
+      addToast('Password Mismatch', 'Password and Confirm Password must match.', 'error');
+      return;
+    }
+
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters long.');
+      return;
+    }
 
     setLoading(true);
     setError('');
@@ -55,7 +67,7 @@ export default function RegisterPage() {
       </div>
 
       <form onSubmit={handleRegister} className="glass-card rounded-3xl p-6 sm:p-8 space-y-4 border border-neutral-800">
-        {error && <div className="p-3 rounded-xl bg-red-950/80 border border-red-500/40 text-red-300 text-xs">{error}</div>}
+        {error && <div className="p-3 rounded-xl bg-red-950/80 border border-red-500/40 text-red-300 text-xs font-medium">{error}</div>}
 
         <div>
           <label className="text-xs font-semibold text-neutral-300 block mb-1">Full Name *</label>
@@ -110,6 +122,21 @@ export default function RegisterPage() {
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              className="w-full bg-neutral-900 border border-neutral-800 rounded-xl pl-10 pr-4 py-2.5 text-xs text-neutral-200 focus:outline-none focus:border-amber-400"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="text-xs font-semibold text-neutral-300 block mb-1">Confirm Password *</label>
+          <div className="relative">
+            <ShieldCheck className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500" />
+            <input
+              type="password"
+              required
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
               placeholder="••••••••"
               className="w-full bg-neutral-900 border border-neutral-800 rounded-xl pl-10 pr-4 py-2.5 text-xs text-neutral-200 focus:outline-none focus:border-amber-400"
             />

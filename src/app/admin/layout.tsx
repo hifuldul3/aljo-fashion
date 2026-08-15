@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
@@ -15,6 +15,7 @@ import {
   Sparkles,
   LogOut,
   ShieldAlert,
+  Lock,
 } from 'lucide-react';
 import { useStore } from '@/lib/store';
 
@@ -22,6 +23,35 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const pathname = usePathname();
   const router = useRouter();
   const { user, setUser, addToast } = useStore();
+  const [checkingAuth, setCheckingAuth] = useState(true);
+
+  useEffect(() => {
+    // Check if user is logged in as ADMIN
+    const checkAdminStatus = async () => {
+      if (!user) {
+        try {
+          const res = await fetch('/api/auth/me');
+          const data = await res.json();
+          if (data.user && data.user.role === 'ADMIN') {
+            setUser(data.user);
+            setCheckingAuth(false);
+          } else {
+            addToast('Access Denied', 'Store Owner / Admin login required to access dashboard.', 'error');
+            router.push('/login');
+          }
+        } catch {
+          router.push('/login');
+        }
+      } else if (user.role !== 'ADMIN') {
+        addToast('Access Denied', 'You do not have owner permissions to view this portal.', 'error');
+        router.push('/login');
+      } else {
+        setCheckingAuth(false);
+      }
+    };
+
+    checkAdminStatus();
+  }, [user, router, setUser, addToast]);
 
   const handleLogout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
@@ -39,6 +69,32 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { name: 'Coupons & Offers', href: '/admin/coupons', icon: Tag },
     { name: 'Content Banners', href: '/admin/banners', icon: ImageIcon },
   ];
+
+  if (checkingAuth) {
+    return (
+      <div className="min-h-screen bg-neutral-950 text-neutral-100 flex flex-col items-center justify-center p-6 space-y-4">
+        <div className="w-12 h-12 rounded-full border-2 border-amber-400 border-t-transparent animate-spin" />
+        <p className="text-xs text-amber-400 font-bold uppercase tracking-widest flex items-center gap-2">
+          <Lock className="w-4 h-4" /> Verifying Store Owner Security Credentials...
+        </p>
+      </div>
+    );
+  }
+
+  if (!user || user.role !== 'ADMIN') {
+    return (
+      <div className="min-h-screen bg-neutral-950 text-neutral-100 flex flex-col items-center justify-center p-6 space-y-4 text-center">
+        <ShieldAlert className="w-16 h-16 text-red-500 mx-auto" />
+        <h2 className="text-2xl font-serif font-bold text-neutral-100">Store Owner Access Required</h2>
+        <p className="text-xs text-neutral-400 max-w-sm">
+          This portal is strictly restricted to authenticated Store Managers &amp; Admins.
+        </p>
+        <Link href="/login" className="px-6 py-2.5 rounded-full bg-gold-gradient text-neutral-950 text-xs font-bold">
+          Log In as Store Owner
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100 flex flex-col md:flex-row">

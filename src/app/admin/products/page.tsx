@@ -3,7 +3,7 @@
 export const dynamic = 'force-dynamic';
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Edit3, Trash2, Copy, Eye, Star, Check, X, Sparkles, Upload } from 'lucide-react';
+import { Plus, Search, Edit3, Trash2, Copy, Eye, Star, Check, X, Sparkles, Upload, Image as ImageIcon, Link as LinkIcon } from 'lucide-react';
 import { useStore } from '@/lib/store';
 
 export default function AdminProductsPage() {
@@ -28,7 +28,10 @@ export default function AdminProductsPage() {
   const [isFeatured, setIsFeatured] = useState(false);
   const [isNewArrival, setIsNewArrival] = useState(true);
   const [isBestSeller, setIsBestSeller] = useState(false);
-  const [imagesText, setImagesText] = useState('');
+  
+  // Feedable Image Gallery State
+  const [imageUrls, setImageUrls] = useState<string[]>([]);
+  const [inputUrl, setInputUrl] = useState('');
 
   const [formSubmitting, setFormSubmitting] = useState(false);
 
@@ -65,7 +68,10 @@ export default function AdminProductsPage() {
     setIsFeatured(false);
     setIsNewArrival(true);
     setIsBestSeller(false);
-    setImagesText('https://images.unsplash.com/photo-1594938298603-c8148c4dae35?auto=format&fit=crop&w=1000&q=80');
+    setImageUrls([
+      'https://images.unsplash.com/photo-1594938298603-c8148c4dae35?auto=format&fit=crop&w=1000&q=80',
+    ]);
+    setInputUrl('');
     setIsModalOpen(true);
   };
 
@@ -81,8 +87,44 @@ export default function AdminProductsPage() {
     setIsFeatured(p.isFeatured);
     setIsNewArrival(p.isNewArrival);
     setIsBestSeller(p.isBestSeller);
-    setImagesText(Array.isArray(p.images) ? p.images.join('\n') : p.images);
+    
+    let parsedImages: string[] = [];
+    try {
+      parsedImages = typeof p.images === 'string' ? JSON.parse(p.images) : p.images;
+    } catch {
+      parsedImages = Array.isArray(p.images) ? p.images : [p.images];
+    }
+    setImageUrls(parsedImages || []);
+    setInputUrl('');
     setIsModalOpen(true);
+  };
+
+  // Image Upload / Add Helpers
+  const handleAddImageUrl = () => {
+    if (!inputUrl.trim()) return;
+    setImageUrls([...imageUrls, inputUrl.trim()]);
+    setInputUrl('');
+    addToast('Image Added', 'Image URL added to product gallery preview.', 'success');
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    Array.from(files).forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target?.result) {
+          setImageUrls((prev) => [...prev, event.target!.result as string]);
+          addToast('Image Feeded', `File "${file.name}" uploaded to gallery preview.`, 'success');
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleRemoveImage = (indexToRemove: number) => {
+    setImageUrls(imageUrls.filter((_, idx) => idx !== indexToRemove));
   };
 
   const handleFormSubmit = async (e: React.FormEvent) => {
@@ -92,8 +134,12 @@ export default function AdminProductsPage() {
       return;
     }
 
+    if (imageUrls.length === 0) {
+      addToast('Error', 'Please add at least one product photo.', 'error');
+      return;
+    }
+
     setFormSubmitting(true);
-    const imagesArray = imagesText.split('\n').map((url) => url.trim()).filter(Boolean);
 
     const payload = {
       name,
@@ -106,7 +152,7 @@ export default function AdminProductsPage() {
       isFeatured,
       isNewArrival,
       isBestSeller,
-      images: imagesArray,
+      images: imageUrls,
     };
 
     try {
@@ -209,68 +255,76 @@ export default function AdminProductsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-900">
-                {filteredProducts.map((p) => (
-                  <tr key={p.id} className="hover:bg-neutral-900/40">
-                    <td className="p-4">
-                      <div className="flex items-center space-x-3">
-                        <img
-                          src={Array.isArray(p.images) ? p.images[0] : JSON.parse(p.images)[0]}
-                          alt={p.name}
-                          className="w-12 h-14 object-cover rounded-lg bg-neutral-800 flex-shrink-0"
-                        />
-                        <div>
-                          <p className="font-bold text-neutral-100 line-clamp-1">{p.name}</p>
-                          <p className="text-[10px] text-neutral-500">{p.gender}</p>
+                {filteredProducts.map((p) => {
+                  let img = 'https://images.unsplash.com/photo-1594938298603-c8148c4dae35?auto=format&fit=crop&w=800&q=80';
+                  try {
+                    const parsed = typeof p.images === 'string' ? JSON.parse(p.images) : p.images;
+                    if (Array.isArray(parsed) && parsed.length > 0) img = parsed[0];
+                  } catch {}
+
+                  return (
+                    <tr key={p.id} className="hover:bg-neutral-900/40">
+                      <td className="p-4">
+                        <div className="flex items-center space-x-3">
+                          <img
+                            src={img}
+                            alt={p.name}
+                            className="w-12 h-14 object-cover rounded-lg bg-neutral-800 flex-shrink-0"
+                          />
+                          <div>
+                            <p className="font-bold text-neutral-100 line-clamp-1">{p.name}</p>
+                            <p className="text-[10px] text-neutral-500">{p.gender}</p>
+                          </div>
                         </div>
-                      </div>
-                    </td>
-                    <td className="p-4 font-mono text-amber-300">{p.SKU}</td>
-                    <td className="p-4">{p.category?.name || 'Unassigned'}</td>
-                    <td className="p-4 font-bold text-neutral-100">
-                      ₹{p.price.toLocaleString()}
-                      {p.discountPrice && (
-                        <span className="text-[10px] text-amber-400 block font-normal">
-                          Disc: ₹{p.discountPrice.toLocaleString()}
+                      </td>
+                      <td className="p-4 font-mono text-amber-300">{p.SKU}</td>
+                      <td className="p-4">{p.category?.name || 'Unassigned'}</td>
+                      <td className="p-4 font-bold text-neutral-100">
+                        ₹{p.price.toLocaleString()}
+                        {p.discountPrice && (
+                          <span className="text-[10px] text-amber-400 block font-normal">
+                            Disc: ₹{p.discountPrice.toLocaleString()}
+                          </span>
+                        )}
+                      </td>
+                      <td className="p-4 font-bold">
+                        <span className={p.stock <= 5 ? 'text-red-400 font-extrabold' : 'text-emerald-400'}>
+                          {p.stock} units
                         </span>
-                      )}
-                    </td>
-                    <td className="p-4 font-bold">
-                      <span className={p.stock <= 5 ? 'text-red-400 font-extrabold' : 'text-emerald-400'}>
-                        {p.stock} units
-                      </span>
-                    </td>
-                    <td className="p-4">
-                      <div className="flex flex-wrap gap-1">
-                        {p.isFeatured && <span className="px-1.5 py-0.5 text-[9px] bg-amber-500/20 text-amber-300 rounded font-bold">FEATURED</span>}
-                        {p.isNewArrival && <span className="px-1.5 py-0.5 text-[9px] bg-blue-500/20 text-blue-300 rounded font-bold">NEW</span>}
-                        {p.isBestSeller && <span className="px-1.5 py-0.5 text-[9px] bg-purple-500/20 text-purple-300 rounded font-bold">BESTSELLER</span>}
-                      </div>
-                    </td>
-                    <td className="p-4 text-right space-x-2">
-                      <button
-                        onClick={() => openEditModal(p)}
-                        className="p-1.5 text-neutral-400 hover:text-amber-400 rounded-lg hover:bg-neutral-800"
-                        title="Edit Product"
-                      >
-                        <Edit3 className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDuplicateProduct(p.id)}
-                        className="p-1.5 text-neutral-400 hover:text-blue-400 rounded-lg hover:bg-neutral-800"
-                        title="Duplicate Product"
-                      >
-                        <Copy className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteProduct(p.id)}
-                        className="p-1.5 text-neutral-400 hover:text-red-400 rounded-lg hover:bg-neutral-800"
-                        title="Delete Product"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="p-4">
+                        <div className="flex flex-wrap gap-1">
+                          {p.isFeatured && <span className="px-1.5 py-0.5 text-[9px] bg-amber-500/20 text-amber-300 rounded font-bold">FEATURED</span>}
+                          {p.isNewArrival && <span className="px-1.5 py-0.5 text-[9px] bg-blue-500/20 text-blue-300 rounded font-bold">NEW</span>}
+                          {p.isBestSeller && <span className="px-1.5 py-0.5 text-[9px] bg-purple-500/20 text-purple-300 rounded font-bold">BESTSELLER</span>}
+                        </div>
+                      </td>
+                      <td className="p-4 text-right space-x-2">
+                        <button
+                          onClick={() => openEditModal(p)}
+                          className="p-1.5 text-neutral-400 hover:text-amber-400 rounded-lg hover:bg-neutral-800"
+                          title="Edit Product"
+                        >
+                          <Edit3 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDuplicateProduct(p.id)}
+                          className="p-1.5 text-neutral-400 hover:text-blue-400 rounded-lg hover:bg-neutral-800"
+                          title="Duplicate Product"
+                        >
+                          <Copy className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteProduct(p.id)}
+                          className="p-1.5 text-neutral-400 hover:text-red-400 rounded-lg hover:bg-neutral-800"
+                          title="Delete Product"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -368,22 +422,79 @@ export default function AdminProductsPage() {
               <div>
                 <label className="text-neutral-300 font-semibold block mb-1">Description</label>
                 <textarea
-                  rows={3}
+                  rows={2}
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   className="w-full bg-neutral-900 border border-neutral-800 rounded-xl p-3 text-neutral-100"
                 />
               </div>
 
-              <div>
-                <label className="text-neutral-300 font-semibold block mb-1">Product Images (URLs separated by newline)</label>
-                <textarea
-                  rows={3}
-                  value={imagesText}
-                  onChange={(e) => setImagesText(e.target.value)}
-                  placeholder="https://images.unsplash.com/..."
-                  className="w-full bg-neutral-900 border border-neutral-800 rounded-xl p-3 text-neutral-100 font-mono text-[11px]"
-                />
+              {/* Feedable Product Images Section */}
+              <div className="p-4 rounded-2xl bg-neutral-900/90 border border-amber-500/20 space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+                    <ImageIcon className="w-4 h-4" /> Feedable Product Photos ({imageUrls.length})
+                  </label>
+                  <span className="text-[10px] text-neutral-400">Upload files or enter image URLs</span>
+                </div>
+
+                {/* Live Image Thumbnail Gallery Preview */}
+                {imageUrls.length > 0 && (
+                  <div className="grid grid-cols-4 gap-3 p-2 bg-neutral-950 rounded-xl border border-neutral-800">
+                    {imageUrls.map((url, idx) => (
+                      <div key={idx} className="relative group aspect-[3/4] rounded-lg overflow-hidden border border-neutral-800 bg-neutral-900">
+                        <img src={url} alt={`Product ${idx}`} className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveImage(idx)}
+                          className="absolute top-1 right-1 p-1 rounded-full bg-red-600/80 text-white opacity-90 group-hover:opacity-100 hover:scale-110 transition-all"
+                          title="Remove image"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                        <span className="absolute bottom-1 left-1 bg-black/70 text-amber-300 text-[9px] font-mono px-1 rounded">
+                          #{idx + 1}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Upload Local Image File Box */}
+                <div className="flex flex-col sm:flex-row gap-3 items-center">
+                  <label className="w-full sm:w-auto flex-1 cursor-pointer flex items-center justify-center space-x-2 px-4 py-2.5 rounded-xl bg-neutral-950 border border-dashed border-amber-400/50 hover:border-amber-400 text-amber-300 font-semibold text-xs transition-colors">
+                    <Upload className="w-4 h-4" />
+                    <span>Upload Image File from Phone/PC</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={handleFileUpload}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+
+                {/* Add Image URL Box */}
+                <div className="flex space-x-2">
+                  <div className="relative flex-1">
+                    <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-neutral-500" />
+                    <input
+                      type="url"
+                      value={inputUrl}
+                      onChange={(e) => setInputUrl(e.target.value)}
+                      placeholder="Paste Image URL (https://...)"
+                      className="w-full bg-neutral-950 border border-neutral-800 rounded-xl pl-9 pr-3 py-2 text-xs text-neutral-200 focus:outline-none focus:border-amber-400 font-mono"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleAddImageUrl}
+                    className="px-4 py-2 rounded-xl bg-amber-500 text-neutral-950 font-bold text-xs hover:bg-amber-400"
+                  >
+                    + Add URL
+                  </button>
+                </div>
               </div>
 
               {/* Flags */}
