@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getCurrentUser, requireAdmin } from '@/lib/auth';
+import { getCurrentUser } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(request: Request) {
+export async function GET() {
   try {
     const user = await getCurrentUser();
     if (!user) {
@@ -48,24 +48,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Order items and shipping address are required' }, { status: 400 });
     }
 
-    let user = await getCurrentUser();
-
-    // If guest checkout, create or find customer user account by email
+    const user = await getCurrentUser();
     if (!user) {
-      const email = shippingAddress.email || `customer-${Date.now()}@guest.com`;
-      let existingUser = await prisma.user.findUnique({ where: { email } });
-      if (!existingUser) {
-        existingUser = await prisma.user.create({
-          data: {
-            name: shippingAddress.fullName || 'Guest Customer',
-            email,
-            passwordHash: 'GUEST_ACCOUNT_HASH',
-            phone: shippingAddress.phone || null,
-            role: 'CUSTOMER',
-          },
-        });
-      }
-      user = existingUser;
+      return NextResponse.json(
+        { error: 'Patron Account Required. Please log in or register an account before placing an order.' },
+        { status: 401 }
+      );
     }
 
     // Generate unique order number (e.g., ALJO-48291)
