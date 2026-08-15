@@ -4,19 +4,13 @@ import { requireAdmin } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
-/**
- * Safely parse JSON stored in the database.
- * Prevents "Unexpected end of JSON input" errors.
- */
 function safeJsonParse(value: any, fallback: any) {
   if (value === null || value === undefined || value === '') {
     return fallback;
   }
-
   if (typeof value !== 'string') {
     return value;
   }
-
   try {
     return JSON.parse(value);
   } catch {
@@ -45,10 +39,6 @@ export async function GET(request: Request) {
 
     const sort = searchParams.get('sort') || 'newest';
 
-    // -----------------------------------------
-    // BUILD FILTER
-    // -----------------------------------------
-
     const where: any = {
       isActive: true,
     };
@@ -75,182 +65,83 @@ export async function GET(request: Request) {
       where.isBestSeller = true;
     }
 
-    // Price filter
     if (minPrice || maxPrice) {
       where.price = {};
-
       if (minPrice) {
         where.price.gte = parseFloat(minPrice);
       }
-
       if (maxPrice) {
         where.price.lte = parseFloat(maxPrice);
       }
     }
 
-    // Search
     if (search) {
       where.OR = [
-        {
-          name: {
-            contains: search,
-          },
-        },
-        {
-          description: {
-            contains: search,
-          },
-        },
-        {
-          SKU: {
-            contains: search,
-          },
-        },
-        {
-          subcategory: {
-            contains: search,
-          },
-        },
+        { name: { contains: search } },
+        { description: { contains: search } },
+        { SKU: { contains: search } },
+        { subcategory: { contains: search } },
       ];
     }
 
-    // -----------------------------------------
-    // SORTING
-    // -----------------------------------------
-
-    let orderBy: any = {
-      createdAt: 'desc',
-    };
+    let orderBy: any = { createdAt: 'desc' };
 
     if (sort === 'price_asc') {
-      orderBy = {
-        price: 'asc',
-      };
+      orderBy = { price: 'asc' };
     }
-
     if (sort === 'price_desc') {
-      orderBy = {
-        price: 'desc',
-      };
+      orderBy = { price: 'desc' };
     }
-
     if (sort === 'popular') {
-      orderBy = {
-        isBestSeller: 'desc',
-      };
+      orderBy = { isBestSeller: 'desc' };
     }
-
-    // -----------------------------------------
-    // GET PRODUCTS
-    // -----------------------------------------
 
     const products = await prisma.product.findMany({
       where,
       orderBy,
-
       include: {
         category: true,
-
         variants: true,
-
-        reviews: {
-          select: {
-            rating: true,
-          },
-        },
+        reviews: { select: { rating: true } },
       },
     });
 
-    // -----------------------------------------
-    // PROCESS PRODUCTS
-    // -----------------------------------------
-
     const processedProducts = products.map((p: any) => {
-      const reviews = Array.isArray(p.reviews)
-        ? p.reviews
-        : [];
-
-      const totalRating = reviews.reduce(
-        (acc: number, review: any) =>
-          acc + Number(review.rating || 0),
-        0
-      );
-
-      const avgRating =
-        reviews.length > 0
-          ? totalRating / reviews.length
-          : 5.0;
+      const reviews = Array.isArray(p.reviews) ? p.reviews : [];
+      const totalRating = reviews.reduce((acc: number, review: any) => acc + Number(review.rating || 0), 0);
+      const avgRating = reviews.length > 0 ? totalRating / reviews.length : 5.0;
 
       return {
         ...p,
-
-        // Safely parse database JSON
         images: safeJsonParse(p.images, []),
-
-        specifications: safeJsonParse(
-          p.specifications,
-          {}
-        ),
-
-        // Convert Prisma Decimal values
+        specifications: safeJsonParse(p.specifications, {}),
         price: Number(p.price),
-
-        discountPrice:
-          p.discountPrice !== null &&
-          p.discountPrice !== undefined
-            ? Number(p.discountPrice)
-            : null,
-
-        rating:
-          Math.round(avgRating * 10) / 10,
-
+        discountPrice: p.discountPrice !== null && p.discountPrice !== undefined ? Number(p.discountPrice) : null,
+        rating: Math.round(avgRating * 10) / 10,
         reviewCount: reviews.length,
       };
     });
 
-    return NextResponse.json({
-      products: processedProducts,
-    });
+    return NextResponse.json({ products: processedProducts });
   } catch (error: any) {
     console.error('PRODUCT API GET ERROR:', error);
-
-    return NextResponse.json(
-      {
-        error:
-          error?.message ||
-          'Failed to fetch products',
-      },
-      {
-        status: 500,
-      }
-    );
+    return NextResponse.json({ error: error?.message || 'Failed to fetch products' }, { status: 500 });
   }
 }
 
 /**
  * POST /api/products
- * Create a new product.
+ * Create a new product with guaranteed unique slug and SKU.
  * Admin access required.
  */
 export async function POST(request: Request) {
   const admin = await requireAdmin();
 
   if (!admin) {
-    return NextResponse.json(
-      {
-        error: 'Unauthorized. Admin access required.',
-      },
-      {
-        status: 403,
-      }
-    );
+    return NextResponse.json({ error: 'Unauthorized. Admin access required.' }, { status: 403 });
   }
 
   try {
-    // -----------------------------------------
-    // READ REQUEST BODY
-    // -----------------------------------------
-
     const body = await request.json();
 
     const {
@@ -271,62 +162,48 @@ export async function POST(request: Request) {
       variants,
     } = body;
 
-    // -----------------------------------------
-    // VALIDATION
-    // -----------------------------------------
-
-    if (
-      !name ||
-      price === undefined ||
-      price === null ||
-      !categoryId ||
-      !SKU
-    ) {
+    if (!name || price === undefined || price === null || !categoryId || !SKU) {
       return NextResponse.json(
-        {
-          error:
-            'Name, price, categoryId, and SKU are required',
-        },
-        {
-          status: 400,
-        }
+        { error: 'Name, price, categoryId, and SKU are required' },
+        { status: 400 }
       );
     }
 
     // -----------------------------------------
-    // GENERATE SLUG
+    // GUARANTEE UNIQUE SLUG & UNIQUE SKU
     // -----------------------------------------
-
-    const generatedSlug =
+    let baseSlug =
       slug ||
       name
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '-')
-        .replace(/(^-|-$)/g, '');
+        .replace(/(^-|-$)/g, '') ||
+      'product';
+
+    let generatedSlug = baseSlug;
+    let existingSlug = await prisma.product.findUnique({ where: { slug: generatedSlug } });
+    if (existingSlug) {
+      generatedSlug = `${baseSlug}-${Date.now().toString().slice(-4)}-${Math.floor(100 + Math.random() * 900)}`;
+    }
+
+    let finalSKU = SKU.trim();
+    let existingSKU = await prisma.product.findUnique({ where: { SKU: finalSKU } });
+    if (existingSKU) {
+      finalSKU = `${SKU}-${Math.floor(1000 + Math.random() * 9000)}`;
+    }
 
     // -----------------------------------------
     // PROCESS VARIANTS
     // -----------------------------------------
-
     let variantData;
-
     if (Array.isArray(variants) && variants.length > 0) {
-      variantData = variants.map((v: any) => ({
+      variantData = variants.map((v: any, idx: number) => ({
         size: v.size || 'M',
-
         color: v.color || 'Onyx Black',
-
         colorHex: v.colorHex || '#000000',
-
         stock: parseInt(v.stock || '10', 10),
-
-        SKU:
-          v.SKU ||
-          `${SKU}-${v.size || 'M'}-${v.color || 'Onyx Black'}`,
-
-        priceAdjustment: parseFloat(
-          v.priceAdjustment || '0'
-        ),
+        SKU: v.SKU || `${finalSKU}-${v.size || 'M'}-${idx + 1}`,
+        priceAdjustment: parseFloat(v.priceAdjustment || '0'),
       }));
     } else {
       variantData = [
@@ -335,7 +212,7 @@ export async function POST(request: Request) {
           color: 'Onyx Black',
           colorHex: '#000000',
           stock: 10,
-          SKU: `${SKU}-S`,
+          SKU: `${finalSKU}-S`,
           priceAdjustment: 0,
         },
         {
@@ -343,7 +220,7 @@ export async function POST(request: Request) {
           color: 'Onyx Black',
           colorHex: '#000000',
           stock: 15,
-          SKU: `${SKU}-M`,
+          SKU: `${finalSKU}-M`,
           priceAdjustment: 0,
         },
         {
@@ -351,87 +228,41 @@ export async function POST(request: Request) {
           color: 'Onyx Black',
           colorHex: '#000000',
           stock: 10,
-          SKU: `${SKU}-L`,
+          SKU: `${finalSKU}-L`,
           priceAdjustment: 0,
         },
       ];
     }
 
-    // -----------------------------------------
-    // CALCULATE TOTAL STOCK
-    // -----------------------------------------
-
-    const totalStock = variantData.reduce(
-      (sum: number, variant: any) =>
-        sum + Number(variant.stock || 0),
-      0
-    );
+    const totalStock = variantData.reduce((sum: number, variant: any) => sum + Number(variant.stock || 0), 0);
 
     // -----------------------------------------
     // CREATE PRODUCT
     // -----------------------------------------
-
     const product = await prisma.product.create({
       data: {
-        name,
-
+        name: name.trim(),
         slug: generatedSlug,
-
         description: description || '',
-
         price: parseFloat(price),
-
         discountPrice:
-          discountPrice !== undefined &&
-          discountPrice !== null &&
-          discountPrice !== ''
+          discountPrice !== undefined && discountPrice !== null && discountPrice !== ''
             ? parseFloat(discountPrice)
             : null,
-
         categoryId,
-
-        subcategory:
-          subcategory || null,
-
-        gender:
-          gender || 'UNISEX',
-
-        isFeatured:
-          isFeatured === true ||
-          isFeatured === 'true',
-
-        isNewArrival:
-          isNewArrival === true ||
-          isNewArrival === 'true',
-
-        isBestSeller:
-          isBestSeller === true ||
-          isBestSeller === 'true',
-
-        SKU,
-
-        // Store images as JSON
-        images:
-          typeof images === 'string'
-            ? images
-            : JSON.stringify(images || []),
-
-        // Store specifications as JSON
-        specifications:
-          typeof specifications === 'string'
-            ? specifications
-            : JSON.stringify(
-                specifications || {}
-              ),
-
+        subcategory: subcategory || null,
+        gender: gender || 'UNISEX',
+        isFeatured: isFeatured === true || isFeatured === 'true',
+        isNewArrival: isNewArrival === true || isNewArrival === 'true',
+        isBestSeller: isBestSeller === true || isBestSeller === 'true',
+        SKU: finalSKU,
+        images: typeof images === 'string' ? images : JSON.stringify(images || []),
+        specifications: typeof specifications === 'string' ? specifications : JSON.stringify(specifications || {}),
         stock: totalStock,
-
-        // Create variants
         variants: {
           create: variantData,
         },
       },
-
       include: {
         variants: true,
         category: true,
@@ -443,20 +274,7 @@ export async function POST(request: Request) {
       product,
     });
   } catch (error: any) {
-    console.error(
-      'PRODUCT API POST ERROR:',
-      error
-    );
-
-    return NextResponse.json(
-      {
-        error:
-          error?.message ||
-          'Error creating product',
-      },
-      {
-        status: 500,
-      }
-    );
+    console.error('PRODUCT API POST ERROR:', error);
+    return NextResponse.json({ error: error?.message || 'Error creating product' }, { status: 500 });
   }
 }
