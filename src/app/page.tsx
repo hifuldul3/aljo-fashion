@@ -20,22 +20,24 @@ async function getHomePageData() {
     });
 
     const newArrivals = await prisma.product.findMany({
-      where: { isActive: true, isNewArrival: true },
-      take: 4,
+      where: { isActive: true },
+      take: 8,
       include: { category: true, variants: true, reviews: { select: { rating: true } } },
       orderBy: { createdAt: 'desc' },
     });
 
     const bestSellers = await prisma.product.findMany({
-      where: { isActive: true, isBestSeller: true },
-      take: 4,
+      where: { isActive: true },
+      take: 8,
       include: { category: true, variants: true, reviews: { select: { rating: true } } },
+      orderBy: { stock: 'desc' },
     });
 
     const featuredProducts = await prisma.product.findMany({
-      where: { isActive: true, isFeatured: true },
+      where: { isActive: true },
       take: 8,
       include: { category: true, variants: true, reviews: { select: { rating: true } } },
+      orderBy: { createdAt: 'desc' },
     });
 
     return {
