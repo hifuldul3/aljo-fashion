@@ -5,7 +5,7 @@ import { signToken } from '@/lib/auth';
 
 export async function POST(request: Request) {
   try {
-    const { name, email, password, phone } = await request.json();
+    const { name, email, password, phone, adminCode } = await request.json();
 
     if (!name || !email || !password) {
       return NextResponse.json({ error: 'Name, email and password are required.' }, { status: 400 });
@@ -40,6 +40,12 @@ export async function POST(request: Request) {
       }
     }
 
+    // Determine account role (Default: CUSTOMER, if valid Admin Key provided -> ADMIN)
+    let assignedRole = 'CUSTOMER';
+    if (adminCode && (adminCode.trim().toUpperCase() === 'ALJO-OWNER-2026' || adminCode.trim() === 'admin123')) {
+      assignedRole = 'ADMIN';
+    }
+
     const passwordHash = await bcrypt.hash(password, 10);
     const user = await prisma.user.create({
       data: {
@@ -47,7 +53,7 @@ export async function POST(request: Request) {
         email: normalizedEmail,
         passwordHash,
         phone: phone ? phone.trim() : null,
-        role: 'CUSTOMER',
+        role: assignedRole,
       },
     });
 

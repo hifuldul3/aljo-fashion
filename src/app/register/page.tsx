@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { User, Mail, Lock, Phone, ShieldCheck, Eye, EyeOff, CheckCircle2, XCircle } from 'lucide-react';
+import { User, Mail, Lock, Phone, ShieldCheck, Eye, EyeOff, CheckCircle2, XCircle, Key } from 'lucide-react';
 import { useStore } from '@/lib/store';
 
 export default function RegisterPage() {
@@ -15,6 +15,7 @@ export default function RegisterPage() {
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [adminCode, setAdminCode] = useState('');
 
   // Show / Hide password toggles
   const [showPassword, setShowPassword] = useState(false);
@@ -48,15 +49,25 @@ export default function RegisterPage() {
       const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password, phone }),
+        body: JSON.stringify({ name, email, password, phone, adminCode }),
       });
       const data = await res.json();
       setLoading(false);
 
       if (res.ok && data.user) {
         setUser(data.user);
-        addToast('Account Created Successfully!', `Welcome to AL-JO Fashion, ${data.user.name}`, 'success');
-        router.push('/account');
+        const isAdmin = data.user.role?.toUpperCase() === 'ADMIN';
+        addToast(
+          isAdmin ? 'Store Owner Account Created!' : 'Account Created Successfully!',
+          `Welcome to AL-JO Fashion, ${data.user.name}`,
+          'success'
+        );
+
+        if (isAdmin) {
+          router.push('/admin');
+        } else {
+          router.push('/account');
+        }
       } else {
         setError(data.error || 'Failed to create account.');
       }
@@ -70,8 +81,8 @@ export default function RegisterPage() {
     <div className="max-w-md mx-auto px-4 py-16 space-y-6">
       <div className="text-center space-y-2">
         <span className="text-xs font-bold uppercase tracking-widest text-amber-400">JOIN THE VIP CIRCLE</span>
-        <h1 className="text-3xl font-serif font-extrabold text-neutral-100">Create Patron Account</h1>
-        <p className="text-xs text-neutral-400">Unlock private trunk previews, saved addresses, and express checkout</p>
+        <h1 className="text-3xl font-serif font-extrabold text-neutral-100">Create Account</h1>
+        <p className="text-xs text-neutral-400">Register once to access order tracking, saved addresses, and patron privileges</p>
       </div>
 
       <form onSubmit={handleRegister} className="glass-card rounded-3xl p-6 sm:p-8 space-y-4 border border-neutral-800">
@@ -185,12 +196,27 @@ export default function RegisterPage() {
           </div>
         </div>
 
+        {/* Optional Owner Passcode */}
+        <div className="pt-2 border-t border-neutral-800/80">
+          <label className="text-[11px] font-bold text-amber-400 block mb-1 flex items-center gap-1">
+            <Key className="w-3.5 h-3.5" /> Store Owner Security Key (Optional for Admin Account)
+          </label>
+          <input
+            type="text"
+            value={adminCode}
+            onChange={(e) => setAdminCode(e.target.value)}
+            placeholder="Enter 'ALJO-OWNER-2026' for Store Owner role"
+            className="w-full bg-neutral-900 border border-neutral-800 rounded-xl px-3 py-2 text-xs text-neutral-200 focus:outline-none focus:border-amber-400 font-mono"
+          />
+          <p className="text-[10px] text-neutral-500 mt-1">Leave blank to create a standard customer account.</p>
+        </div>
+
         <button
           type="submit"
           disabled={loading || isPasswordMismatch}
           className="w-full py-3.5 rounded-xl bg-gold-gradient text-neutral-950 font-extrabold text-xs uppercase tracking-wider hover:opacity-90 transition-opacity shadow-lg disabled:opacity-50"
         >
-          {loading ? 'Creating Account...' : 'Create Patron Account'}
+          {loading ? 'Creating Account...' : 'Create Account'}
         </button>
 
         <div className="text-center pt-2 text-xs text-neutral-400">
